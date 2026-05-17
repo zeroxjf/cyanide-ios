@@ -53,6 +53,15 @@
 }
 
 
+- (void)runUpdateCheck {
+    UITabBarController *tab = (UITabBarController *)self.window.rootViewController;
+    if (![tab isKindOfClass:UITabBarController.class]) return;
+    // UpdateChecker walks `presentedViewController` to find the topmost VC and
+    // presents from there, so if the privacy alert is up, the update prompt
+    // stacks on top — independent of consent state.
+    [[UpdateChecker shared] checkForUpdatesIfNeededFrom:tab];
+}
+
 - (void)showPrivacyConsentIfNeeded {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     if ([ud boolForKey:@"cyanide.privacy.logConsentShown"]) return;
@@ -76,15 +85,12 @@
 - (void)sceneDidBecomeActive:(UIScene *)scene {
     [self selectInitialTabIfNeeded];
     settings_application_did_become_active();
+    // Independent paths: privacy consent prompt (one-time) and update check
+    // (every foreground, deduped per-process by UpdateChecker.didCheckThisLaunch).
+    // The two can stack on first launch — that's intentional, an available
+    // update shouldn't be hidden behind a privacy preference.
     [self showPrivacyConsentIfNeeded];
-
-    // Skip the update check on first boot to avoid stacking two alerts.
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"cyanide.privacy.logConsentShown"]) {
-        UITabBarController *tab = (UITabBarController *)self.window.rootViewController;
-        if ([tab isKindOfClass:UITabBarController.class]) {
-            [[UpdateChecker shared] checkForUpdatesIfNeededFrom:tab];
-        }
-    }
+    [self runUpdateCheck];
 }
 
 
